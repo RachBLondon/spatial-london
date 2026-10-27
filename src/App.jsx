@@ -412,6 +412,20 @@ export default function App() {
             )}
           </div>
         </div>
+
+        <div className="opacity-control" title="Ward fill opacity">
+          <span className="opacity-value">{Math.round(opacity * 100)}%</span>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.05}
+            value={opacity}
+            onChange={(e) => setOpacity(Number(e.target.value))}
+            aria-label="Map opacity"
+          />
+          <span className="opacity-icon">◐</span>
+        </div>
       </div>
 
       <div className="controls">
@@ -451,23 +465,6 @@ export default function App() {
             </div>
           </div>
         )}
-
-        <div className="control-row">
-          <label>Map opacity</label>
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.05}
-            value={opacity}
-            onChange={(e) => setOpacity(Number(e.target.value))}
-          />
-          <div className="control-row-labels">
-            <span>Transparent</span>
-            <strong>{Math.round(opacity * 100)}%</strong>
-            <span>Opaque</span>
-          </div>
-        </div>
       </div>
     </div>
   )
