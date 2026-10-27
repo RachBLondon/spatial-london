@@ -103,26 +103,181 @@ body {
   margin-top: 6px;
 }
 
-.year-control {
-  padding: 14px 20px 18px;
-  border-top: 1px solid #2a2d35;
+/* Small vertical opacity control, sitting on the map itself rather
+   than taking up a full row in the bottom control bar. */
+.opacity-control {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 1000;
+  width: 32px;
+  height: 108px;
+  background: rgba(20, 22, 28, 0.9);
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
 }
 
-.year-control input[type='range'] {
+.opacity-control .opacity-value {
+  font-size: 0.65rem;
+  color: #c4c7cf;
+}
+
+.opacity-control .opacity-icon {
+  font-size: 0.7rem;
+  color: #767b86;
+}
+
+.opacity-control input[type='range'] {
+  width: 64px;
+  height: 4px;
+  margin: 0;
+  transform: rotate(-90deg);
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+}
+
+.opacity-control input[type='range']::-webkit-slider-runnable-track {
+  -webkit-appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: #2a2d35;
+}
+
+.opacity-control input[type='range']::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: #2a2d35;
+}
+
+.opacity-control input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border-radius: 50%;
+  background: #e8e8e8;
+  border: 2px solid #0f1115;
+  cursor: pointer;
+}
+
+.opacity-control input[type='range']::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #e8e8e8;
+  border: 2px solid #0f1115;
+  cursor: pointer;
+}
+
+.controls {
+  padding: 10px 20px 16px;
+  border-top: 1px solid #2a2d35;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.control-row label {
+  display: block;
+  font-size: 0.75rem;
+  color: #767b86;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 2px;
+}
+
+.control-row input[type='range'] {
   width: 100%;
 }
 
-.year-control-labels {
+.control-row-labels {
   display: flex;
   justify-content: space-between;
   font-size: 0.85rem;
   color: #a0a4ad;
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
-.year-control-labels strong {
+.control-row-labels strong {
   color: #e8e8e8;
   font-size: 1rem;
+}
+
+/* Dual-handle slider: two <input type="range"> stacked on one track.
+   The track itself ignores pointer events so clicks always reach
+   whichever thumb is on top; only the thumbs are interactive. */
+.dual-slider {
+  position: relative;
+  height: 20px;
+  display: flex;
+  align-items: center;
+}
+
+.dual-slider-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 4px;
+  border-radius: 2px;
+  background: #2a2d35;
+}
+
+.dual-slider-range {
+  position: absolute;
+  height: 4px;
+  border-radius: 2px;
+  background: #5b8def;
+}
+
+.dual-slider input[type='range'] {
+  position: absolute;
+  left: 0;
+  right: 0;
+  width: 100%;
+  margin: 0;
+  background: transparent;
+  pointer-events: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.dual-slider input[type='range']::-webkit-slider-runnable-track {
+  -webkit-appearance: none;
+  background: transparent;
+}
+
+.dual-slider input[type='range']::-moz-range-track {
+  background: transparent;
+}
+
+.dual-slider input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  pointer-events: auto;
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background: #e8e8e8;
+  border: 2px solid #0f1115;
+  cursor: pointer;
+}
+
+.dual-slider input[type='range']::-moz-range-thumb {
+  pointer-events: auto;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #e8e8e8;
+  border: 2px solid #0f1115;
+  cursor: pointer;
 }
 
 .status-message {
@@ -137,4 +292,25 @@ body {
 
 .status-error {
   color: #ff8080;
+}
+
+/* Leaflet's default tooltip is a white rounded speech-bubble with a
+   little pointer triangle — clashes with the dark UI and doesn't suit
+   a sharp-edged ward outline. Square it off and restyle to match. */
+.leaflet-tooltip {
+  background-color: rgba(20, 22, 28, 0.95);
+  border: 1px solid #2a2d35;
+  border-radius: 0;
+  color: #e8e8e8;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  padding: 8px 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.leaflet-tooltip-top:before,
+.leaflet-tooltip-bottom:before,
+.leaflet-tooltip-left:before,
+.leaflet-tooltip-right:before {
+  display: none;
 }

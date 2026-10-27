@@ -14,7 +14,7 @@ const PRICE_COLOR_STOPS = [
 ]
 
 // Diverging red -> grey -> blue for the % change view: red means the
-// ward has got cheaper since its baseline year, blue means pricier.
+// ward has got cheaper since the baseline year, blue means pricier.
 const CHANGE_COLOR_STOPS = [
   [0.0, [178, 24, 43]],
   [0.5, [230, 230, 230]],
@@ -97,8 +97,9 @@ function formatPct(value) {
 // that has no actual sales data with the most recent earlier year that
 // does. A ward with a single sale in 1995 and nothing again until 2003
 // should read as "unchanged" across 1996-2002 on the map, not grey.
-// Returns: { filledByWard: Map(ward_code -> Map(year -> {price, sales, actualYear})),
-//            baselineByWard: Map(ward_code -> {year, price}) }
+// Returns Map(ward_code -> Map(year -> {price, sales, actualYear})).
+// A ward's map only has entries from its first-ever actual sale onward;
+// years before that stay unset (true "no data"), by design.
 function buildFilledSeries(priceRows, years) {
   const rawByWard = new Map()
   for (const row of priceRows) {
@@ -110,7 +111,6 @@ function buildFilledSeries(priceRows, years) {
   }
 
   const filledByWard = new Map()
-  const baselineByWard = new Map()
 
   for (const [wardCode, yearMap] of rawByWard) {
     const filled = new Map()
@@ -121,9 +121,6 @@ function buildFilledSeries(priceRows, years) {
       if (actual) {
         lastActual = { year, ...actual }
         filled.set(year, { price: actual.median_price, sales: actual.sales, actualYear: year })
-        if (!baselineByWard.has(wardCode)) {
-          baselineByWard.set(wardCode, { year, price: actual.median_price })
-        }
       } else if (lastActual) {
         filled.set(year, {
           price: lastActual.median_price,
@@ -131,21 +128,72 @@ function buildFilledSeries(priceRows, years) {
           actualYear: lastActual.year,
         })
       }
-      // else: no data yet for this ward at all, leave unset (true grey)
+      // else: ward hasn't had its first sale yet, leave unset (true grey)
     }
     filledByWard.set(wardCode, filled)
   }
 
-  return { filledByWard, baselineByWard }
+  return filledByWard
+}
+
+// Two thumbs on one track: drag either end to set the baseline or
+// compare year. Each <input type="range"> is stacked on top of the
+// other with a transparent track — only the thumb itself captures
+// clicks (pointer-events scoped to ::-webkit-slider-thumb /
+// ::-moz-range-thumb) — so both ends stay independently grabbable
+// even when they're close together.
+function DualYearSlider({ min, max, low, high, onLowChange, onHighChange }) {
+  const pct = (year) => ((year - min) / (max - min)) * 100
+
+  return (
+    <div className="dual-slider">
+      <div className="dual-slider-track" />
+      <div
+        className="dual-slider-range"
+        style={{ left: `${pct(low)}%`, width: `${pct(high) - pct(low)}%` }}
+      />
+      <input
+        type="range"
+        min={min}
+        max={max}
+        value={low}
+        onChange={(e) => onLowChange(Number(e.target.value))}
+        aria-label="Baseline year"
+      />
+      <input
+        type="range"
+        min={min}
+        max={max}
+        value={high}
+        onChange={(e) => onHighChange(Number(e.target.value))}
+        aria-label="Compare year"
+      />
+    </div>
+  )
+}
+
+// A ward's value as of `year`, used both for the year being viewed and
+// for whatever year is chosen as the % change baseline. If the ward's
+// own series doesn't reach back to `year` (its first sale was later),
+// falls back to its earliest available entry instead, and says so via
+// usedYear differing from the requested year.
+function seriesValueAt(series, year) {
+  if (!series) return null
+  const atYear = series.get(year)
+  if (atYear) return { ...atYear, usedYear: year }
+  const firstKey = series.keys().next().value
+  if (firstKey == null) return null
+  return { ...series.get(firstKey), usedYear: firstKey }
 }
 
 export default function App() {
   const [boundaries, setBoundaries] = useState(null) // GeoJSON FeatureCollection
   const [filledByWard, setFilledByWard] = useState(null)
-  const [baselineByWard, setBaselineByWard] = useState(null)
   const [years, setYears] = useState([])
   const [selectedYear, setSelectedYear] = useState(null)
+  const [baselineYear, setBaselineYear] = useState(null)
   const [mode, setMode] = useState('price') // 'price' | 'change'
+  const [opacity, setOpacity] = useState(0.85)
   const [status, setStatus] = useState('loading') // loading | ready | error
   const [errorMessage, setErrorMessage] = useState('')
 
@@ -167,16 +215,11 @@ export default function App() {
           (a, b) => a - b
         )
 
-        const { filledByWard: filled, baselineByWard: baseline } = buildFilledSeries(
-          priceRows,
-          sortedYears
-        )
-
         setBoundaries({ type: 'FeatureCollection', features })
-        setFilledByWard(filled)
-        setBaselineByWard(baseline)
+        setFilledByWard(buildFilledSeries(priceRows, sortedYears))
         setYears(sortedYears)
-        setSelectedYear(sortedYears[sortedYears.length - 1])
+        setSelectedYear(sortedYears[0]) // start at the earliest year, e.g. 1995
+        setBaselineYear(sortedYears[0])
         setStatus('ready')
       } catch (err) {
         console.error(err)
@@ -187,29 +230,44 @@ export default function App() {
     load()
   }, [])
 
+  function handleYearChange(nextYear) {
+    setSelectedYear(nextYear)
+    // baseline can't sit after the year being viewed
+    setBaselineYear((b) => (b != null && b > nextYear ? nextYear : b))
+  }
+
+  function handleBaselineChange(nextBaseline) {
+    setBaselineYear(nextBaseline)
+    setSelectedYear((y) => (y != null && y < nextBaseline ? nextBaseline : y))
+  }
+
   // Per-ward value for the selected year, in the current mode.
   const yearData = useMemo(() => {
     if (!filledByWard || selectedYear == null) return null
     const map = new Map()
     for (const [wardCode, series] of filledByWard) {
-      const entry = series.get(selectedYear)
-      if (!entry) continue
+      const current = seriesValueAt(series, selectedYear)
+      if (!current) continue
       if (mode === 'price') {
-        map.set(wardCode, { value: entry.price, sales: entry.sales, actualYear: entry.actualYear })
+        map.set(wardCode, {
+          value: current.price,
+          sales: current.sales,
+          actualYear: current.actualYear,
+        })
       } else {
-        const base = baselineByWard.get(wardCode)
+        const base = seriesValueAt(series, baselineYear)
         const pctChange =
-          base && base.price ? ((entry.price - base.price) / base.price) * 100 : null
+          base && base.price ? ((current.price - base.price) / base.price) * 100 : null
         map.set(wardCode, {
           value: pctChange,
-          sales: entry.sales,
-          actualYear: entry.actualYear,
-          baselineYear: base?.year,
+          sales: current.sales,
+          actualYear: current.actualYear,
+          baselineUsedYear: base?.usedYear,
         })
       }
     }
     return map
-  }, [filledByWard, baselineByWard, selectedYear, mode])
+  }, [filledByWard, selectedYear, baselineYear, mode])
 
   const scaleBound = useMemo(() => {
     if (!yearData) return 1
@@ -244,25 +302,29 @@ export default function App() {
     const { value } = feature.properties
     const fillColor =
       mode === 'price' ? colorForPrice(value, scaleBound) : colorForChange(value, scaleBound)
-    return { fillColor, fillOpacity: 0.85, color: 'white', weight: 0.6 }
+    return { fillColor, fillOpacity: opacity, color: 'white', weight: 0.6 }
   }
 
   function onEachFeature(feature, layer) {
-    const { name, value, sales, actualYear, baselineYear } = feature.properties
+    const { name, value, sales, actualYear, baselineUsedYear } = feature.properties
     if (value == null) {
       layer.bindTooltip(`<strong>${name}</strong><br/>No sales on record`, { sticky: true })
       return
     }
     const carriedNote =
       actualYear != null && actualYear !== selectedYear
-        ? `<br/><em>carried forward from ${actualYear}</em>`
+        ? `<br/><em>price carried forward from ${actualYear}</em>`
+        : ''
+    const baselineNote =
+      mode === 'change' && baselineUsedYear != null && baselineUsedYear !== baselineYear
+        ? `<br/><em>baseline: ward's first sale, ${baselineUsedYear}</em>`
         : ''
     const line =
       mode === 'price'
         ? `${formatPrice(value)} median`
         : `${formatPct(value)} since ${baselineYear}`
     layer.bindTooltip(
-      `<strong>${name}</strong><br/>${line}<br/>${sales} sale${sales === 1 ? '' : 's'}${carriedNote}`,
+      `<strong>${name}</strong><br/>${line}<br/>${sales} sale${sales === 1 ? '' : 's'}${carriedNote}${baselineNote}`,
       { sticky: true }
     )
   }
@@ -281,8 +343,8 @@ export default function App() {
 
   const subtitle =
     mode === 'price'
-      ? `Median house price by ward, ${selectedYear}`
-      : `% change in median price since first recorded sale, as of ${selectedYear}`
+      ? `Median house price by ward — ${selectedYear}`
+      : `% change in median price, ${baselineYear} → ${selectedYear}`
 
   return (
     <div className="app">
@@ -315,7 +377,7 @@ export default function App() {
           />
           {enrichedData && (
             <GeoJSON
-              key={`${mode}-${selectedYear}`}
+              key={`${mode}-${selectedYear}-${baselineYear}`}
               data={enrichedData}
               style={styleFeature}
               onEachFeature={onEachFeature}
@@ -350,21 +412,59 @@ export default function App() {
             )}
           </div>
         </div>
+
+        <div className="opacity-control" title="Ward fill opacity">
+          <span className="opacity-value">{Math.round(opacity * 100)}%</span>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.05}
+            value={opacity}
+            onChange={(e) => setOpacity(Number(e.target.value))}
+            aria-label="Map opacity"
+          />
+          <span className="opacity-icon">◐</span>
+        </div>
       </div>
 
-      <div className="year-control">
-        <input
-          type="range"
-          min={years[0]}
-          max={years[years.length - 1]}
-          value={selectedYear ?? years[0]}
-          onChange={(e) => setSelectedYear(Number(e.target.value))}
-        />
-        <div className="year-control-labels">
-          <span>{years[0]}</span>
-          <strong>{selectedYear}</strong>
-          <span>{years[years.length - 1]}</span>
-        </div>
+      <div className="controls">
+        {mode === 'change' ? (
+          <div className="control-row">
+            <label>Baseline → compare year</label>
+            <DualYearSlider
+              min={years[0]}
+              max={years[years.length - 1]}
+              low={baselineYear ?? years[0]}
+              high={selectedYear ?? years[years.length - 1]}
+              onLowChange={handleBaselineChange}
+              onHighChange={handleYearChange}
+            />
+            <div className="control-row-labels">
+              <span>{years[0]}</span>
+              <strong>
+                {baselineYear} → {selectedYear}
+              </strong>
+              <span>{years[years.length - 1]}</span>
+            </div>
+          </div>
+        ) : (
+          <div className="control-row">
+            <label>Year</label>
+            <input
+              type="range"
+              min={years[0]}
+              max={years[years.length - 1]}
+              value={selectedYear ?? years[0]}
+              onChange={(e) => handleYearChange(Number(e.target.value))}
+            />
+            <div className="control-row-labels">
+              <span>{years[0]}</span>
+              <strong>{selectedYear}</strong>
+              <span>{years[years.length - 1]}</span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
