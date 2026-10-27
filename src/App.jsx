@@ -136,6 +136,42 @@ function buildFilledSeries(priceRows, years) {
   return filledByWard
 }
 
+// Two thumbs on one track: drag either end to set the baseline or
+// compare year. Each <input type="range"> is stacked on top of the
+// other with a transparent track — only the thumb itself captures
+// clicks (pointer-events scoped to ::-webkit-slider-thumb /
+// ::-moz-range-thumb) — so both ends stay independently grabbable
+// even when they're close together.
+function DualYearSlider({ min, max, low, high, onLowChange, onHighChange }) {
+  const pct = (year) => ((year - min) / (max - min)) * 100
+
+  return (
+    <div className="dual-slider">
+      <div className="dual-slider-track" />
+      <div
+        className="dual-slider-range"
+        style={{ left: `${pct(low)}%`, width: `${pct(high) - pct(low)}%` }}
+      />
+      <input
+        type="range"
+        min={min}
+        max={max}
+        value={low}
+        onChange={(e) => onLowChange(Number(e.target.value))}
+        aria-label="Baseline year"
+      />
+      <input
+        type="range"
+        min={min}
+        max={max}
+        value={high}
+        onChange={(e) => onHighChange(Number(e.target.value))}
+        aria-label="Compare year"
+      />
+    </div>
+  )
+}
+
 // A ward's value as of `year`, used both for the year being viewed and
 // for whatever year is chosen as the % change baseline. If the ward's
 // own series doesn't reach back to `year` (its first sale was later),
@@ -379,39 +415,42 @@ export default function App() {
       </div>
 
       <div className="controls">
-        {mode === 'change' && (
+        {mode === 'change' ? (
           <div className="control-row">
-            <label>Baseline year</label>
+            <label>Baseline → compare year</label>
+            <DualYearSlider
+              min={years[0]}
+              max={years[years.length - 1]}
+              low={baselineYear ?? years[0]}
+              high={selectedYear ?? years[years.length - 1]}
+              onLowChange={handleBaselineChange}
+              onHighChange={handleYearChange}
+            />
+            <div className="control-row-labels">
+              <span>{years[0]}</span>
+              <strong>
+                {baselineYear} → {selectedYear}
+              </strong>
+              <span>{years[years.length - 1]}</span>
+            </div>
+          </div>
+        ) : (
+          <div className="control-row">
+            <label>Year</label>
             <input
               type="range"
               min={years[0]}
               max={years[years.length - 1]}
-              value={baselineYear ?? years[0]}
-              onChange={(e) => handleBaselineChange(Number(e.target.value))}
+              value={selectedYear ?? years[0]}
+              onChange={(e) => handleYearChange(Number(e.target.value))}
             />
             <div className="control-row-labels">
               <span>{years[0]}</span>
-              <strong>{baselineYear}</strong>
+              <strong>{selectedYear}</strong>
               <span>{years[years.length - 1]}</span>
             </div>
           </div>
         )}
-
-        <div className="control-row">
-          <label>{mode === 'change' ? 'Compare year' : 'Year'}</label>
-          <input
-            type="range"
-            min={years[0]}
-            max={years[years.length - 1]}
-            value={selectedYear ?? years[0]}
-            onChange={(e) => handleYearChange(Number(e.target.value))}
-          />
-          <div className="control-row-labels">
-            <span>{years[0]}</span>
-            <strong>{selectedYear}</strong>
-            <span>{years[years.length - 1]}</span>
-          </div>
-        </div>
 
         <div className="control-row">
           <label>Map opacity</label>
