@@ -1,0 +1,109 @@
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #0f1115;
+  color: #e8e8e8;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.app-header {
+  padding: 12px 20px;
+  border-bottom: 1px solid #2a2d35;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.app-header p {
+  margin: 4px 0 0;
+  color: #a0a4ad;
+  font-size: 0.9rem;
+}
+
+.map-wrapper {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.map {
+  height: 100%;
+  width: 100%;
+  background: #0f1115;
+}
+
+.legend {
+  position: absolute;
+  bottom: 24px;
+  right: 16px;
+  z-index: 1000;
+  background: rgba(20, 22, 28, 0.9);
+  padding: 10px 12px;
+  border-radius: 8px;
+  width: 200px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.legend-gradient {
+  height: 10px;
+  border-radius: 4px;
+}
+
+.legend-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: #c4c7cf;
+  margin-top: 6px;
+}
+
+.year-control {
+  padding: 14px 20px 18px;
+  border-top: 1px solid #2a2d35;
+}
+
+.year-control input[type='range'] {
+  width: 100%;
+}
+
+.year-control-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: #a0a4ad;
+  margin-top: 4px;
+}
+
+.year-control-labels strong {
+  color: #e8e8e8;
+  font-size: 1rem;
+}
+
+.status-message {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  font-size: 1rem;
+  color: #a0a4ad;
+  background: #0f1115;
+}
+
+.status-error {
+  color: #ff8080;
+}
