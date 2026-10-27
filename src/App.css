@@ -293,3 +293,24 @@ body {
 .status-error {
   color: #ff8080;
 }
+
+/* Leaflet's default tooltip is a white rounded speech-bubble with a
+   little pointer triangle — clashes with the dark UI and doesn't suit
+   a sharp-edged ward outline. Square it off and restyle to match. */
+.leaflet-tooltip {
+  background-color: rgba(20, 22, 28, 0.95);
+  border: 1px solid #2a2d35;
+  border-radius: 0;
+  color: #e8e8e8;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  padding: 8px 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.leaflet-tooltip-top:before,
+.leaflet-tooltip-bottom:before,
+.leaflet-tooltip-left:before,
+.leaflet-tooltip-right:before {
+  display: none;
+}
