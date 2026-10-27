@@ -22,6 +22,11 @@ body {
 .app-header {
   padding: 12px 20px;
   border-bottom: 1px solid #2a2d35;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
 .app-header h1 {
@@ -33,6 +38,32 @@ body {
   margin: 4px 0 0;
   color: #a0a4ad;
   font-size: 0.9rem;
+}
+
+.mode-toggle {
+  display: flex;
+  border: 1px solid #2a2d35;
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.mode-toggle button {
+  background: transparent;
+  border: none;
+  color: #a0a4ad;
+  padding: 7px 14px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.mode-toggle button.active {
+  background: #2a2d35;
+  color: #e8e8e8;
+}
+
+.mode-toggle button:not(:last-child) {
+  border-right: 1px solid #2a2d35;
 }
 
 .map-wrapper {
