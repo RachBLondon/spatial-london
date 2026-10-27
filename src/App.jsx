@@ -350,7 +350,7 @@ export default function App() {
     <div className="app">
       <header className="app-header">
         <div>
-          <h1>London Place Change</h1>
+          <h1>London House Prices</h1>
           <p>{subtitle}</p>
         </div>
         <div className="mode-toggle">
@@ -372,7 +372,7 @@ export default function App() {
       <div className="map-wrapper">
         <MapContainer center={[51.509, -0.118]} zoom={10} scrollWheelZoom className="map">
           <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | Contains OS data &copy; Crown copyright and database right 2026'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           {enrichedData && (
