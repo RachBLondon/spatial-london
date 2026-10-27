@@ -350,7 +350,7 @@ export default function App() {
     <div className="app">
       <header className="app-header">
         <div>
-          <h1>London Place Change</h1>
+          <h1>London House Prices</h1>
           <p>{subtitle}</p>
         </div>
         <div className="mode-toggle">
