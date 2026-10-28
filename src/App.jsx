@@ -24,17 +24,18 @@ const CHANGE_COLOR_STOPS = [
 const PAGE_SIZE = 1000
 
 // Supabase's REST API caps a single select at 1000 rows by default.
-// ward_prices has ~22,000 rows, so a plain .select() silently truncates
-// to the first page — this is what was causing most of the map to be
-// grey. Loop with .range() until a page comes back short.
-async function fetchAllRows(table, columns) {
+// ward_prices has tens of thousands of rows, so a plain .select()
+// silently truncates to the first page — this is what was causing
+// most of the map to be grey. Loop with .range() until a page comes
+// back short. `applyFilter`, if given, is called on the query builder
+// before each page (e.g. to scope ward_prices to one tenure).
+async function fetchAllRows(table, columns, applyFilter) {
   let from = 0
   const allRows = []
   while (true) {
-    const { data, error } = await supabase
-      .from(table)
-      .select(columns)
-      .range(from, from + PAGE_SIZE - 1)
+    let query = supabase.from(table).select(columns)
+    if (applyFilter) query = applyFilter(query)
+    const { data, error } = await query.range(from, from + PAGE_SIZE - 1)
     if (error) throw error
     allRows.push(...data)
     if (data.length < PAGE_SIZE) break
@@ -186,9 +187,10 @@ function seriesValueAt(series, year) {
   return { ...series.get(firstKey), usedYear: firstKey }
 }
 
+const TENURE_LABELS = { ALL: 'All tenures', F: 'Freehold', L: 'Leasehold' }
+
 export default function App() {
   const [boundaries, setBoundaries] = useState(null) // GeoJSON FeatureCollection
-  const [filledByWard, setFilledByWard] = useState(null)
   const [years, setYears] = useState([])
   const [selectedYear, setSelectedYear] = useState(null)
   const [baselineYear, setBaselineYear] = useState(null)
@@ -197,12 +199,23 @@ export default function App() {
   const [status, setStatus] = useState('loading') // loading | ready | error
   const [errorMessage, setErrorMessage] = useState('')
 
+  // ward_prices holds one row per ward/year/tenure now. Rather than pull
+  // all three tenures up front (3x the data most people never switch
+  // to), fetch 'ALL' first and lazily fetch freehold/leasehold only
+  // when picked, caching each by tenure so switching back is instant.
+  const [tenure, setTenure] = useState('ALL') // user's current selection
+  const [displayTenure, setDisplayTenure] = useState('ALL') // what's rendered
+  const [tenureCache, setTenureCache] = useState({}) // { ALL: filledByWard, F: ..., L: ... }
+  const [tenureLoading, setTenureLoading] = useState(false)
+
   useEffect(() => {
     async function load() {
       try {
         const [boundaryRows, priceRows] = await Promise.all([
           fetchAllRows('ward_boundaries_geojson', 'ward_code, name, geojson'),
-          fetchAllRows('ward_prices', 'ward_code, year, median_price, sales'),
+          fetchAllRows('ward_prices', 'ward_code, year, median_price, sales', (q) =>
+            q.eq('tenure', 'ALL')
+          ),
         ])
 
         const features = boundaryRows.map((row) => ({
@@ -216,7 +229,7 @@ export default function App() {
         )
 
         setBoundaries({ type: 'FeatureCollection', features })
-        setFilledByWard(buildFilledSeries(priceRows, sortedYears))
+        setTenureCache({ ALL: buildFilledSeries(priceRows, sortedYears) })
         setYears(sortedYears)
         setSelectedYear(sortedYears[0]) // start at the earliest year, e.g. 1995
         setBaselineYear(sortedYears[0])
@@ -229,6 +242,39 @@ export default function App() {
     }
     load()
   }, [])
+
+  // Fetch a tenure's price rows the first time it's selected.
+  useEffect(() => {
+    if (status !== 'ready') return
+    if (tenureCache[tenure]) {
+      setDisplayTenure(tenure)
+      return
+    }
+    let cancelled = false
+    setTenureLoading(true)
+    fetchAllRows('ward_prices', 'ward_code, year, median_price, sales', (q) =>
+      q.eq('tenure', tenure)
+    )
+      .then((rows) => {
+        if (cancelled) return
+        setTenureCache((prev) => ({ ...prev, [tenure]: buildFilledSeries(rows, years) }))
+        setDisplayTenure(tenure)
+      })
+      .catch((err) => {
+        if (cancelled) return
+        console.error(err)
+        setErrorMessage(err.message ?? String(err))
+        setTenure((current) => (current === tenure ? displayTenure : current))
+      })
+      .finally(() => {
+        if (!cancelled) setTenureLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [tenure, status])
+
+  const filledByWard = tenureCache[displayTenure] ?? null
 
   function handleYearChange(nextYear) {
     setSelectedYear(nextYear)
@@ -341,31 +387,49 @@ export default function App() {
     )
   }
 
+  const tenureNote = tenure !== 'ALL' ? ` (${TENURE_LABELS[tenure].toLowerCase()})` : ''
   const subtitle =
     mode === 'price'
-      ? `Median house price by ward — ${selectedYear}`
-      : `% change in median price, ${baselineYear} → ${selectedYear}`
+      ? `Median house price by ward — ${selectedYear}${tenureNote}`
+      : `% change in median price, ${baselineYear} → ${selectedYear}${tenureNote}`
 
   return (
     <div className="app">
       <header className="app-header">
-        <div>
-          <h1>London House Prices</h1>
-          <p>{subtitle}</p>
+        <div className="app-header-row">
+          <div>
+            <h1>London House Prices</h1>
+            <p>{subtitle}</p>
+          </div>
+          <div className="mode-toggle">
+            <button
+              className={mode === 'price' ? 'active' : ''}
+              onClick={() => setMode('price')}
+            >
+              Price
+            </button>
+            <button
+              className={mode === 'change' ? 'active' : ''}
+              onClick={() => setMode('change')}
+            >
+              % change
+            </button>
+          </div>
         </div>
-        <div className="mode-toggle">
-          <button
-            className={mode === 'price' ? 'active' : ''}
-            onClick={() => setMode('price')}
-          >
-            Price
-          </button>
-          <button
-            className={mode === 'change' ? 'active' : ''}
-            onClick={() => setMode('change')}
-          >
-            % change
-          </button>
+
+        <div className="app-header-row">
+          <div className="tenure-toggle">
+            {Object.entries(TENURE_LABELS).map(([key, label]) => (
+              <button
+                key={key}
+                className={tenure === key ? 'active' : ''}
+                onClick={() => setTenure(key)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {tenureLoading && <span className="tenure-loading">Loading…</span>}
         </div>
       </header>
 
