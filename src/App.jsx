@@ -441,7 +441,7 @@ export default function App() {
           />
           {enrichedData && (
             <GeoJSON
-              key={`${mode}-${selectedYear}-${baselineYear}`}
+              key={`${mode}-${selectedYear}-${baselineYear}-${displayTenure}`}
               data={enrichedData}
               style={styleFeature}
               onEachFeature={onEachFeature}
